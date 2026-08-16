@@ -6,11 +6,21 @@ import {
 
 import { sepolia } from "viem/chains";
 
+import RiskHistoryChart, {
+  type ChartPoint,
+} from "./RiskHistoryChart";
+
 const CONTRACT_ADDRESS =
   "0x2De6A72d27532d1DCe42a28547c7BD271c6A60A0" as Address;
 
 const RPC_URL =
   "https://ethereum-sepolia-rpc.publicnode.com";
+
+const HISTORY_URL =
+  "https://rwa-risk-api-u5im.onrender.com/history/ACME-001";
+
+const ANALYZE_URL =
+  "https://rwa-risk-api-u5im.onrender.com/analyze";
 
 const contractAbi = [
   {
@@ -51,6 +61,24 @@ type PortfolioData = {
   riskThreshold: number;
 };
 
+type RiskHistoryItem = {
+  id: number;
+  portfolioId: string;
+  portfolioName: string;
+  valuation: number;
+  debt: number;
+  ltv: number;
+  riskThreshold: number;
+  thresholdBreach: number;
+  riskLevel: string;
+  riskTriggered: boolean;
+  valuationConfidence: number | null;
+  aiSummary: string | null;
+  recommendedAction: string | null;
+  requiresHumanReview: boolean;
+  createdAt: string;
+};
+
 async function getPortfolioData(): Promise<PortfolioData | null> {
   try {
     const client = createPublicClient({
@@ -58,26 +86,29 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
       transport: http(RPC_URL),
     });
 
-    const [portfolioValueRaw, debtRaw, riskThresholdRaw] =
-      await Promise.all([
-        client.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: contractAbi,
-          functionName: "portfolioValue",
-        }),
+    const [
+      portfolioValueRaw,
+      debtRaw,
+      riskThresholdRaw,
+    ] = await Promise.all([
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "portfolioValue",
+      }),
 
-        client.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: contractAbi,
-          functionName: "debt",
-        }),
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "debt",
+      }),
 
-        client.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: contractAbi,
-          functionName: "riskThreshold",
-        }),
-      ]);
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "riskThreshold",
+      }),
+    ]);
 
     const portfolioValue =
       Number(portfolioValueRaw);
@@ -116,7 +147,7 @@ async function getRiskAnalysis(
       portfolio.riskThreshold;
 
     const response = await fetch(
-      "https://rwa-risk-api-u5im.onrender.com/analyze",
+      ANALYZE_URL,
       {
         method: "POST",
 
@@ -174,6 +205,37 @@ async function getRiskAnalysis(
   }
 }
 
+async function getRiskHistory(): Promise<RiskHistoryItem[]> {
+  try {
+    const response = await fetch(
+      HISTORY_URL,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `History API returned ${response.status}`,
+      );
+    }
+
+    const data =
+      (await response.json()) as RiskHistoryItem[];
+
+    return data
+      .slice()
+      .reverse();
+  } catch (error) {
+    console.error(
+      "Risk history error:",
+      error,
+    );
+
+    return [];
+  }
+}
+
 export default async function Home() {
   const portfolio =
     await getPortfolioData();
@@ -182,6 +244,9 @@ export default async function Home() {
     portfolio
       ? await getRiskAnalysis(portfolio)
       : null;
+
+  const history =
+    await getRiskHistory();
 
   const portfolioValue =
     portfolio?.portfolioValue ?? 0;
@@ -194,6 +259,14 @@ export default async function Home() {
 
   const riskThreshold =
     portfolio?.riskThreshold ?? 0;
+
+  const chartData: ChartPoint[] =
+    history.map((item) => ({
+      time: new Date(
+        item.createdAt,
+      ).toLocaleString(),
+      ltv: item.ltv,
+    }));
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -224,6 +297,13 @@ export default async function Home() {
               {risk
                 ? "CONNECTED"
                 : "UNAVAILABLE"}
+            </span>
+
+            <span className="text-emerald-300">
+              Risk History:{" "}
+              {history.length > 0
+                ? "CONNECTED"
+                : "NO DATA"}
             </span>
           </div>
         </header>
@@ -330,6 +410,36 @@ export default async function Home() {
           </div>
         </section>
 
+        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+                LTV Risk History
+              </p>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Historical loan-to-value against the configured risk threshold.
+              </p>
+            </div>
+
+            <p className="text-sm text-slate-400">
+              {history.length} recorded assessment
+              {history.length === 1
+                ? ""
+                : "s"}
+            </p>
+          </div>
+
+          <div className="mt-6">
+            <RiskHistoryChart
+              data={chartData}
+              riskThreshold={
+                riskThreshold
+              }
+            />
+          </div>
+        </section>
+
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
             <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
@@ -359,7 +469,7 @@ export default async function Home() {
             Live Infrastructure
           </p>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-5 grid gap-4 md:grid-cols-4">
             <StatusItem
               label="Chainlink CRE"
               status="Operational"
@@ -380,6 +490,15 @@ export default async function Home() {
                 risk
                   ? "Online"
                   : "Unavailable"
+              }
+            />
+
+            <StatusItem
+              label="Supabase History"
+              status={
+                history.length > 0
+                  ? "Connected"
+                  : "No Data"
               }
             />
           </div>
@@ -454,3 +573,5 @@ function formatMoney(
 
   return `$${value.toLocaleString()}`;
 }
+
+  
