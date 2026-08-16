@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   createPublicClient,
   http,
@@ -16,11 +18,8 @@ const CONTRACT_ADDRESS =
 const RPC_URL =
   "https://ethereum-sepolia-rpc.publicnode.com";
 
-const HISTORY_URL =
-  "https://rwa-risk-api-u5im.onrender.com/history/ACME-001";
-
-const LATEST_URL =
-  "https://rwa-risk-api-u5im.onrender.com/latest/ACME-001";
+const API_BASE =
+  "https://rwa-risk-api-u5im.onrender.com";
 
 const contractAbi = [
   {
@@ -69,6 +68,12 @@ type RiskHistoryItem = {
   recommendedAction: string | null;
   requiresHumanReview: boolean;
   createdAt: string;
+};
+
+type PageProps = {
+  searchParams: Promise<{
+    mode?: string;
+  }>;
 };
 
 async function getPortfolioData(): Promise<PortfolioData | null> {
@@ -130,10 +135,12 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
   }
 }
 
-async function getLatestRisk(): Promise<RiskHistoryItem | null> {
+async function getLatestRisk(
+  portfolioId: string,
+): Promise<RiskHistoryItem | null> {
   try {
     const response = await fetch(
-      LATEST_URL,
+      `${API_BASE}/latest/${portfolioId}`,
       {
         cache: "no-store",
       },
@@ -156,10 +163,12 @@ async function getLatestRisk(): Promise<RiskHistoryItem | null> {
   }
 }
 
-async function getRiskHistory(): Promise<RiskHistoryItem[]> {
+async function getRiskHistory(
+  portfolioId: string,
+): Promise<RiskHistoryItem[]> {
   try {
     const response = await fetch(
-      HISTORY_URL,
+      `${API_BASE}/history/${portfolioId}`,
       {
         cache: "no-store",
       },
@@ -187,39 +196,70 @@ async function getRiskHistory(): Promise<RiskHistoryItem[]> {
   }
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: PageProps) {
+  const params =
+    await searchParams;
+
+  const demoMode =
+    params.mode === "demo";
+
+  const portfolioId =
+    demoMode
+      ? "ACME-DEMO-001"
+      : "ACME-001";
+
   const [
-    portfolio,
+    livePortfolio,
     risk,
     history,
   ] = await Promise.all([
-    getPortfolioData(),
-    getLatestRisk(),
-    getRiskHistory(),
+    demoMode
+      ? Promise.resolve(null)
+      : getPortfolioData(),
+
+    getLatestRisk(
+      portfolioId,
+    ),
+
+    getRiskHistory(
+      portfolioId,
+    ),
   ]);
 
   const portfolioValue =
-  portfolio?.portfolioValue ??
-  risk?.valuation ??
-  0;
+    demoMode
+      ? risk?.valuation ?? 0
+      : livePortfolio?.portfolioValue ??
+        risk?.valuation ??
+        0;
 
-const debt =
-  portfolio?.debt ??
-  risk?.debt ??
-  0;
+  const debt =
+    demoMode
+      ? risk?.debt ?? 0
+      : livePortfolio?.debt ??
+        risk?.debt ??
+        0;
 
-const currentLTV =
-  portfolio?.currentLTV ??
-  risk?.ltv ??
-  0;
+  const currentLTV =
+    demoMode
+      ? risk?.ltv ?? 0
+      : livePortfolio?.currentLTV ??
+        risk?.ltv ??
+        0;
 
-const riskThreshold =
-  portfolio?.riskThreshold ??
-  risk?.riskThreshold ??
-  0;
+  const riskThreshold =
+    demoMode
+      ? risk?.riskThreshold ?? 0
+      : livePortfolio?.riskThreshold ??
+        risk?.riskThreshold ??
+        0;
 
-const usingFallback =
-  !portfolio && !!risk;
+  const usingFallback =
+    !demoMode &&
+    !livePortfolio &&
+    !!risk;
 
   const chartData: ChartPoint[] =
     history.map((item) => ({
@@ -229,37 +269,80 @@ const usingFallback =
       ltv: item.ltv,
     }));
 
+  const displayName =
+    demoMode
+      ? "Acme Property Fund - Demo"
+      : "Acme Property Fund";
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <header className="mb-10">
+        <header className="mb-8">
           <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
             RWA Risk Intelligence
           </p>
 
           <h1 className="mt-3 text-4xl font-semibold">
-            Acme Property Fund
+            {displayName}
           </h1>
 
           <p className="mt-2 text-slate-400">
             Chainlink CRE powered portfolio monitoring
           </p>
 
-          <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <span
-  className={
-    usingFallback
-      ? "text-amber-300"
-      : "text-emerald-300"
-  }
->
-  Portfolio Data:{" "}
-  {portfolio
-    ? "LIVE ON-CHAIN"
-    : usingFallback
-      ? "LAST KNOWN DATA"
-      : "UNAVAILABLE"}
-</span>
+          <div className="mt-6 inline-flex rounded-xl border border-slate-800 bg-slate-900 p-1">
+            <Link
+              href="/?mode=live"
+              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
+                !demoMode
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              LIVE PORTFOLIO
+            </Link>
+
+            <Link
+              href="/?mode=demo"
+              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
+                demoMode
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              DEMO SCENARIO
+            </Link>
+          </div>
+
+          {demoMode && (
+            <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              Demonstration data only. This scenario is separate from the live ACME-001 portfolio and does not represent current on-chain state.
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            {!demoMode && (
+              <span
+                className={
+                  usingFallback
+                    ? "text-amber-300"
+                    : "text-emerald-300"
+                }
+              >
+                Portfolio Data:{" "}
+                {livePortfolio
+                  ? "LIVE ON-CHAIN"
+                  : usingFallback
+                    ? "LAST KNOWN DATA"
+                    : "UNAVAILABLE"}
+              </span>
+            )}
+
+            {demoMode && (
+              <span className="text-amber-300">
+                Portfolio Data: DEMO DATASET
+              </span>
+            )}
 
             <span className="text-emerald-300">
               Latest Risk Assessment:{" "}
@@ -281,7 +364,7 @@ const usingFallback =
           <MetricCard
             label="Portfolio Value"
             value={
-              portfolio
+              portfolioValue
                 ? formatMoney(
                     portfolioValue,
                   )
@@ -292,7 +375,7 @@ const usingFallback =
           <MetricCard
             label="Debt"
             value={
-              portfolio
+              debt
                 ? formatMoney(debt)
                 : "--"
             }
@@ -301,7 +384,7 @@ const usingFallback =
           <MetricCard
             label="Current LTV"
             value={
-              portfolio
+              currentLTV
                 ? `${currentLTV.toFixed(
                     2,
                   )}%`
@@ -312,7 +395,7 @@ const usingFallback =
           <MetricCard
             label="Risk Threshold"
             value={
-              portfolio
+              riskThreshold
                 ? `${riskThreshold.toFixed(
                     2,
                   )}%`
@@ -336,8 +419,7 @@ const usingFallback =
 
               <h2
                 className={`mt-2 text-3xl font-semibold ${
-                  risk?.riskLevel ===
-                  "HIGH"
+                  risk?.riskLevel === "HIGH"
                     ? "text-red-300"
                     : "text-emerald-300"
                 }`}
@@ -446,7 +528,9 @@ const usingFallback =
 
               <p className="mt-1 text-lg font-medium">
                 {risk
-                  ? `${risk.ltv.toFixed(2)}%`
+                  ? `${risk.ltv.toFixed(
+                      2,
+                    )}%`
                   : "--"}
               </p>
             </div>
@@ -483,21 +567,27 @@ const usingFallback =
 
         <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-            Live Infrastructure
+            Infrastructure
           </p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-4">
             <StatusItem
               label="Chainlink CRE"
-              status="Operational"
+              status={
+                demoMode
+                  ? "Demo Context"
+                  : "Operational"
+              }
             />
 
             <StatusItem
               label="Ethereum Sepolia"
               status={
-                portfolio
-                  ? "Connected"
-                  : "Unavailable"
+                demoMode
+                  ? "Not Used"
+                  : livePortfolio
+                    ? "Connected"
+                    : "Fallback"
               }
             />
 
@@ -521,19 +611,21 @@ const usingFallback =
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-            On-Chain Contract
-          </p>
+        {!demoMode && (
+          <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+              On-Chain Contract
+            </p>
 
-          <p className="mt-3 break-all font-mono text-sm text-slate-300">
-            {CONTRACT_ADDRESS}
-          </p>
+            <p className="mt-3 break-all font-mono text-sm text-slate-300">
+              {CONTRACT_ADDRESS}
+            </p>
 
-          <p className="mt-2 text-sm text-slate-500">
-            Ethereum Sepolia
-          </p>
-        </section>
+            <p className="mt-2 text-sm text-slate-500">
+              Ethereum Sepolia
+            </p>
+          </section>
+        )}
       </div>
     </main>
   );
