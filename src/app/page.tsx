@@ -19,8 +19,8 @@ const RPC_URL =
 const HISTORY_URL =
   "https://rwa-risk-api-u5im.onrender.com/history/ACME-001";
 
-const ANALYZE_URL =
-  "https://rwa-risk-api-u5im.onrender.com/analyze";
+const LATEST_URL =
+  "https://rwa-risk-api-u5im.onrender.com/latest/ACME-001";
 
 const contractAbi = [
   {
@@ -45,14 +45,6 @@ const contractAbi = [
     outputs: [{ type: "uint256" }],
   },
 ] as const;
-
-type RiskAnalysis = {
-  riskLevel: string;
-  summary: string;
-  thresholdBreach: number;
-  recommendedAction: string;
-  requiresHumanReview: boolean;
-};
 
 type PortfolioData = {
   portfolioValue: number;
@@ -138,66 +130,25 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
   }
 }
 
-async function getRiskAnalysis(
-  portfolio: PortfolioData,
-): Promise<RiskAnalysis | null> {
+async function getLatestRisk(): Promise<RiskHistoryItem | null> {
   try {
-    const riskTriggered =
-      portfolio.currentLTV >
-      portfolio.riskThreshold;
-
     const response = await fetch(
-      ANALYZE_URL,
+      LATEST_URL,
       {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          portfolioId: "ACME-001",
-          portfolioName:
-            "Acme Property Fund",
-
-          previousValuation:
-            portfolio.portfolioValue,
-
-          currentValuation:
-            portfolio.portfolioValue,
-
-          debt:
-            portfolio.debt,
-
-          previousLTV:
-            portfolio.currentLTV,
-
-          currentLTV:
-            portfolio.currentLTV,
-
-          riskThreshold:
-            portfolio.riskThreshold,
-
-          valuationConfidence: 95,
-
-          riskTriggered,
-        }),
-
         cache: "no-store",
       },
     );
 
     if (!response.ok) {
       throw new Error(
-        `Risk API returned ${response.status}`,
+        `Latest risk API returned ${response.status}`,
       );
     }
 
     return response.json();
   } catch (error) {
     console.error(
-      "Risk Analyst API error:",
+      "Latest risk API error:",
       error,
     );
 
@@ -237,16 +188,15 @@ async function getRiskHistory(): Promise<RiskHistoryItem[]> {
 }
 
 export default async function Home() {
-  const portfolio =
-    await getPortfolioData();
-
-  const risk =
-    portfolio
-      ? await getRiskAnalysis(portfolio)
-      : null;
-
-  const history =
-    await getRiskHistory();
+  const [
+    portfolio,
+    risk,
+    history,
+  ] = await Promise.all([
+    getPortfolioData(),
+    getLatestRisk(),
+    getRiskHistory(),
+  ]);
 
   const portfolioValue =
     portfolio?.portfolioValue ?? 0;
@@ -293,7 +243,7 @@ export default async function Home() {
             </span>
 
             <span className="text-emerald-300">
-              AI Risk Analyst:{" "}
+              Latest Risk Assessment:{" "}
               {risk
                 ? "CONNECTED"
                 : "UNAVAILABLE"}
@@ -447,7 +397,7 @@ export default async function Home() {
             </p>
 
             <p className="mt-4 leading-7 text-slate-200">
-              {risk?.summary ??
+              {risk?.aiSummary ??
                 "Risk analysis is currently unavailable."}
             </p>
           </div>
@@ -461,6 +411,54 @@ export default async function Home() {
               {risk?.recommendedAction ??
                 "No recommendation is currently available."}
             </p>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            Latest Assessment
+          </p>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-sm text-slate-500">
+                Assessment LTV
+              </p>
+
+              <p className="mt-1 text-lg font-medium">
+                {risk
+                  ? `${risk.ltv.toFixed(2)}%`
+                  : "--"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">
+                Valuation Confidence
+              </p>
+
+              <p className="mt-1 text-lg font-medium">
+                {risk?.valuationConfidence != null
+                  ? `${risk.valuationConfidence.toFixed(
+                      0,
+                    )}%`
+                  : "--"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">
+                Recorded
+              </p>
+
+              <p className="mt-1 text-lg font-medium">
+                {risk
+                  ? new Date(
+                      risk.createdAt,
+                    ).toLocaleString()
+                  : "--"}
+              </p>
+            </div>
           </div>
         </section>
 
@@ -485,7 +483,7 @@ export default async function Home() {
             />
 
             <StatusItem
-              label="AI Risk Analyst"
+              label="Latest Assessment API"
               status={
                 risk
                   ? "Online"
@@ -573,5 +571,4 @@ function formatMoney(
 
   return `$${value.toLocaleString()}`;
 }
-
   
