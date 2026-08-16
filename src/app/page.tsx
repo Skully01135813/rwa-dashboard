@@ -199,16 +199,27 @@ export default async function Home() {
   ]);
 
   const portfolioValue =
-    portfolio?.portfolioValue ?? 0;
+  portfolio?.portfolioValue ??
+  risk?.valuation ??
+  0;
 
-  const debt =
-    portfolio?.debt ?? 0;
+const debt =
+  portfolio?.debt ??
+  risk?.debt ??
+  0;
 
-  const currentLTV =
-    portfolio?.currentLTV ?? 0;
+const currentLTV =
+  portfolio?.currentLTV ??
+  risk?.ltv ??
+  0;
 
-  const riskThreshold =
-    portfolio?.riskThreshold ?? 0;
+const riskThreshold =
+  portfolio?.riskThreshold ??
+  risk?.riskThreshold ??
+  0;
+
+const usingFallback =
+  !portfolio && !!risk;
 
   const chartData: ChartPoint[] =
     history.map((item) => ({
@@ -235,12 +246,20 @@ export default async function Home() {
           </p>
 
           <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <span className="text-emerald-300">
-              Sepolia Contract:{" "}
-              {portfolio
-                ? "CONNECTED"
-                : "UNAVAILABLE"}
-            </span>
+            <span
+  className={
+    usingFallback
+      ? "text-amber-300"
+      : "text-emerald-300"
+  }
+>
+  Portfolio Data:{" "}
+  {portfolio
+    ? "LIVE ON-CHAIN"
+    : usingFallback
+      ? "LAST KNOWN DATA"
+      : "UNAVAILABLE"}
+</span>
 
             <span className="text-emerald-300">
               Latest Risk Assessment:{" "}
