@@ -622,9 +622,15 @@ export default async function Home({
 
               <p className="mt-1 text-lg font-medium">
                 {risk
-                  ? new Date(
-                    risk.createdAt,
-                  ).toLocaleString()
+                  ? new Date(risk.createdAt).toLocaleString("en-AU", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "UTC",
+                      timeZoneName: "short",
+                    })
                   : "--"}
               </p>
             </div>
