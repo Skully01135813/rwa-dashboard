@@ -577,9 +577,14 @@ export default async function Home({
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-            Latest Assessment
-          </p>
+         <div>
+  <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+    Latest AI Advisory Assessment
+  </p>
+  <p className="mt-2 text-xs text-slate-500">
+    Recorded advisory analysis from the AI and risk-history layer.
+  </p>
+</div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div>
@@ -611,9 +616,9 @@ export default async function Home({
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">
-                Recorded
-              </p>
+             <p className="text-sm text-slate-500">
+               AI Advisory Recorded
+             </p>
 
               <p className="mt-1 text-lg font-medium">
                 {risk
