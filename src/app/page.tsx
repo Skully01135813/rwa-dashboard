@@ -13,7 +13,7 @@ import RiskHistoryChart, {
 } from "./RiskHistoryChart";
 
 const CONTRACT_ADDRESS =
-  "0x2De6A72d27532d1DCe42a28547c7BD271c6A60A0" as Address;
+  "0xc399129Db5BE56176cF833BBbcda9E48a2f31759" as Address;
 
 const RPC_URL =
   "https://ethereum-sepolia-rpc.publicnode.com";
@@ -43,6 +43,30 @@ const contractAbi = [
     inputs: [],
     outputs: [{ type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "hasRiskAssessment",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "bool" }],
+  },
+
+  {
+    type: "function",
+    name: "lastRiskTriggered",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "bool" }],
+  },
+
+  {
+    type: "function",
+    name: "lastRiskAssessmentTimestamp",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint64" }],
+  },
+
 ] as const;
 
 type PortfolioData = {
@@ -50,6 +74,9 @@ type PortfolioData = {
   debt: number;
   currentLTV: number;
   riskThreshold: number;
+  hasRiskAssessment: boolean;
+  lastRiskTriggered: boolean;
+  lastRiskAssessmentTimestamp: number;
 };
 
 type RiskHistoryItem = {
@@ -87,6 +114,9 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
       portfolioValueRaw,
       debtRaw,
       riskThresholdRaw,
+      hasRiskAssessmentRaw,
+      lastRiskTriggeredRaw,
+      lastRiskAssessmentTimestampRaw,
     ] = await Promise.all([
       client.readContract({
         address: CONTRACT_ADDRESS,
@@ -105,8 +135,25 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
         abi: contractAbi,
         functionName: "riskThreshold",
       }),
-    ]);
 
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "hasRiskAssessment",
+      }),
+
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "lastRiskTriggered",
+      }),
+
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractAbi,
+        functionName: "lastRiskAssessmentTimestamp",
+      }),
+    ]);
     const portfolioValue =
       Number(portfolioValueRaw);
 
@@ -116,6 +163,15 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
     const riskThreshold =
       Number(riskThresholdRaw);
 
+    const hasRiskAssessment =
+      Boolean(hasRiskAssessmentRaw);
+
+    const lastRiskTriggered =
+      Boolean(lastRiskTriggeredRaw);
+
+    const lastRiskAssessmentTimestamp =
+      Number(lastRiskAssessmentTimestampRaw);
+
     const currentLTV =
       (debt / portfolioValue) * 100;
 
@@ -124,7 +180,11 @@ async function getPortfolioData(): Promise<PortfolioData | null> {
       debt,
       currentLTV,
       riskThreshold,
+      hasRiskAssessment,
+      lastRiskTriggered,
+      lastRiskAssessmentTimestamp,
     };
+
   } catch (error) {
     console.error(
       "Sepolia contract read failed:",
@@ -232,29 +292,29 @@ export default async function Home({
     demoMode
       ? risk?.valuation ?? 0
       : livePortfolio?.portfolioValue ??
-        risk?.valuation ??
-        0;
+      risk?.valuation ??
+      0;
 
   const debt =
     demoMode
       ? risk?.debt ?? 0
       : livePortfolio?.debt ??
-        risk?.debt ??
-        0;
+      risk?.debt ??
+      0;
 
   const currentLTV =
     demoMode
       ? risk?.ltv ?? 0
       : livePortfolio?.currentLTV ??
-        risk?.ltv ??
-        0;
+      risk?.ltv ??
+      0;
 
   const riskThreshold =
     demoMode
       ? risk?.riskThreshold ?? 0
       : livePortfolio?.riskThreshold ??
-        risk?.riskThreshold ??
-        0;
+      risk?.riskThreshold ??
+      0;
 
   const usingFallback =
     !demoMode &&
@@ -293,22 +353,20 @@ export default async function Home({
           <div className="mt-6 inline-flex rounded-xl border border-slate-800 bg-slate-900 p-1">
             <Link
               href="/?mode=live"
-              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
-                !demoMode
+              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${!demoMode
                   ? "bg-emerald-500/20 text-emerald-300"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               LIVE PORTFOLIO
             </Link>
 
             <Link
               href="/?mode=demo"
-              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
-                demoMode
+              className={`rounded-lg px-5 py-2 text-sm font-medium transition ${demoMode
                   ? "bg-amber-500/20 text-amber-300"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               DEMO SCENARIO
             </Link>
@@ -366,8 +424,8 @@ export default async function Home({
             value={
               portfolioValue
                 ? formatMoney(
-                    portfolioValue,
-                  )
+                  portfolioValue,
+                )
                 : "--"
             }
           />
@@ -386,8 +444,8 @@ export default async function Home({
             value={
               currentLTV
                 ? `${currentLTV.toFixed(
-                    2,
-                  )}%`
+                  2,
+                )}%`
                 : "--"
             }
           />
@@ -397,19 +455,18 @@ export default async function Home({
             value={
               riskThreshold
                 ? `${riskThreshold.toFixed(
-                    2,
-                  )}%`
+                  2,
+                )}%`
                 : "--"
             }
           />
         </section>
 
         <section
-          className={`mt-6 rounded-2xl border p-6 ${
-            risk?.riskLevel === "HIGH"
+          className={`mt-6 rounded-2xl border p-6 ${risk?.riskLevel === "HIGH"
               ? "border-red-500/30 bg-red-500/10"
               : "border-emerald-500/30 bg-emerald-500/10"
-          }`}
+            }`}
         >
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
@@ -418,11 +475,10 @@ export default async function Home({
               </p>
 
               <h2
-                className={`mt-2 text-3xl font-semibold ${
-                  risk?.riskLevel === "HIGH"
+                className={`mt-2 text-3xl font-semibold ${risk?.riskLevel === "HIGH"
                     ? "text-red-300"
                     : "text-emerald-300"
-                }`}
+                  }`}
               >
                 {risk?.riskLevel ??
                   "UNAVAILABLE"}
@@ -438,8 +494,8 @@ export default async function Home({
                 <p className="mt-1 text-xl font-semibold">
                   {risk
                     ? `${risk.thresholdBreach.toFixed(
-                        2,
-                      )} pts`
+                      2,
+                    )} pts`
                     : "--"}
                 </p>
               </div>
@@ -529,8 +585,8 @@ export default async function Home({
               <p className="mt-1 text-lg font-medium">
                 {risk
                   ? `${risk.ltv.toFixed(
-                      2,
-                    )}%`
+                    2,
+                  )}%`
                   : "--"}
               </p>
             </div>
@@ -543,8 +599,8 @@ export default async function Home({
               <p className="mt-1 text-lg font-medium">
                 {risk?.valuationConfidence != null
                   ? `${risk.valuationConfidence.toFixed(
-                      0,
-                    )}%`
+                    0,
+                  )}%`
                   : "--"}
               </p>
             </div>
@@ -557,8 +613,8 @@ export default async function Home({
               <p className="mt-1 text-lg font-medium">
                 {risk
                   ? new Date(
-                      risk.createdAt,
-                    ).toLocaleString()
+                    risk.createdAt,
+                  ).toLocaleString()
                   : "--"}
               </p>
             </div>
@@ -608,6 +664,42 @@ export default async function Home({
                   : "No Data"
               }
             />
+
+            <StatusItem
+              label="On-Chain Risk Assessment"
+              status={
+                demoMode
+                  ? "Not Used"
+                  : !livePortfolio?.hasRiskAssessment
+                    ? "Not Recorded"
+                    : livePortfolio.lastRiskTriggered
+                      ? "HIGH"
+                      : "SAFE"
+              }
+            />
+
+            <StatusItem
+              label="Last On-Chain Assessment"
+              status={
+                demoMode
+                  ? "Not Used"
+                  : livePortfolio?.hasRiskAssessment &&
+                    livePortfolio.lastRiskAssessmentTimestamp
+                    ? new Date(
+                      livePortfolio.lastRiskAssessmentTimestamp * 1000,
+                    ).toLocaleString("en-AU", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "UTC",
+                      timeZoneName: "short",
+                    })
+                    : "Not Recorded"
+              }
+            />
+
           </div>
         </section>
 
@@ -682,4 +774,4 @@ function formatMoney(
 
   return `$${value.toLocaleString()}`;
 }
-  
+
