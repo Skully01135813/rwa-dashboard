@@ -549,9 +549,14 @@ export default async function Home({
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-              AI Risk Analysis
-            </p>
+            <div>
+  <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+    AI Advisory Analysis
+  </p>
+  <p className="mt-2 text-xs text-slate-500">
+    Explanation and guidance only — verified risk state is determined independently.
+  </p>
+</div>
 
             <p className="mt-4 leading-7 text-slate-200">
               {risk?.aiSummary ??
@@ -622,9 +627,14 @@ export default async function Home({
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-            Infrastructure
-          </p>
+          <div>
+  <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+    Verified Risk Infrastructure
+  </p>
+  <p className="mt-2 text-sm text-slate-400">
+    Deterministic risk state and supporting infrastructure. AI analysis is advisory and does not override verified on-chain outcomes.
+  </p>
+</div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-4">
             <StatusItem
