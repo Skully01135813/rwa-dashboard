@@ -630,6 +630,7 @@ export default async function Home({
                       minute: "2-digit",
                       timeZone: "UTC",
                       timeZoneName: "short",
+                      hour12: false, 
                     })
                   : "--"}
               </p>
